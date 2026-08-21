@@ -1,0 +1,388 @@
+# Transcrição da Reunião – Desenvolvimento da Teleconsulta
+
+**Produto:** Plataforma de Agendamento Médico
+**Objetivo da reunião:** Definir o escopo e as atividades para desenvolvimento da funcionalidade de teleconsulta
+**Duração aproximada:** 25 minutos
+
+## Participantes
+
+**Marina Souza – Product Manager**
+Responsável pelo produto, definição de escopo e priorização das necessidades do negócio.
+
+**Rafael Lima – Tech Lead**
+Responsável pelas decisões técnicas, arquitetura, integrações e direcionamento do desenvolvimento.
+
+**Camila Rocha – Product Designer / UX**
+Responsável pela experiência do paciente e do médico durante a teleconsulta.
+
+**Lucas Martins – Desenvolvedor Backend**
+Responsável pelas APIs, regras de negócio e integração com o serviço de videoconferência.
+
+**Fernanda Alves – QA / Analista de Qualidade**
+Responsável pelos cenários de teste, critérios de aceite e qualidade da entrega.
+
+---
+
+## TRANSCRIÇÃO
+
+**09:02 – Marina:**
+Bom dia, pessoal. Podemos começar? A ideia hoje é fecharmos o que efetivamente entra na primeira versão da teleconsulta. O agendamento já existe, então eu queria evitar que a gente ampliasse a discussão para cadastro, agenda ou pagamento. O foco é o que acontece quando uma consulta já agendada é do tipo online.
+
+**09:03 – Rafael:**
+Beleza. Para mim, a primeira decisão é justamente onde começa a teleconsulta dentro da jornada atual. O paciente já tem a consulta na área de "Meus Agendamentos". Precisamos decidir se aparece um botão de entrar na consulta ali ou se criamos uma área específica.
+
+**09:03 – Camila:**
+Eu manteria em "Meus Agendamentos". Criar outra área só para isso adicionaria mais um caminho. Para o paciente, aquela consulta já existe. Quando estiver próximo do horário, podemos apresentar o botão "Entrar na teleconsulta".
+
+**09:04 – Lucas:**
+Aí precisamos definir "próximo do horário". Cinco minutos antes? Quinze?
+
+**09:04 – Marina:**
+Eu tinha pensado em dez minutos antes.
+
+**09:04 – Fernanda:**
+Isso precisa virar regra de negócio, porque vou precisar testar tanto antes quanto depois desse limite.
+
+**09:05 – Rafael:**
+Podemos fechar em dez minutos antes. E depois da consulta? Quanto tempo o paciente ainda consegue tentar entrar?
+
+**09:05 – Marina:**
+Boa pergunta. Não tinha pensado nisso.
+
+**09:05 – Lucas:**
+Se não definirmos, tecnicamente podemos deixar a sala aberta enquanto o atendimento estiver ativo pelo médico.
+
+**09:06 – Camila:**
+Eu acho melhor. Porque pode haver atraso do médico. Se bloquear às 10h para uma consulta de 10h, o paciente vai achar que perdeu a consulta.
+
+**09:06 – Marina:**
+Então não vamos colocar um limite fixo para depois do horário nesta primeira versão. O botão aparece dez minutos antes e fica disponível enquanto a consulta estiver com status de atendimento disponível.
+
+**09:07 – Fernanda:**
+Anotado. Preciso que esse status esteja disponível na API para eu conseguir validar.
+
+**09:07 – Rafael:**
+Lucas, isso fica com você. Precisamos expor a informação se aquela teleconsulta pode ou não ser acessada.
+
+**09:07 – Lucas:**
+Sim. Posso incluir isso no endpoint que já retorna os detalhes do agendamento. Não acho que precisa criar outro só para isso.
+
+**09:08 – Marina:**
+Perfeito.
+
+**09:08 – Camila:**
+Mudando completamente de assunto antes que eu esqueça: vocês assistiram ao jogo ontem?
+
+**09:08 – Lucas:**
+Eu assisti só o segundo tempo. Devia ter ido dormir.
+
+**09:08 – Rafael:**
+Eu nem quero falar sobre futebol hoje.
+
+**09:08 – Fernanda:**
+Então vamos preservar a saúde mental do Rafael e voltar para a teleconsulta.
+
+**09:09 – Marina:**
+Por favor. Senão essa reunião vai virar terapia em grupo.
+
+**09:09 – Rafael:**
+Voltando. A segunda decisão importante é vídeo. Eu não recomendo desenvolver uma solução WebRTC inteira do zero nesse MVP. Temos que integrar com um provedor de videoconferência.
+
+**09:09 – Lucas:**
+Concordo. A API do nosso backend cria a sala, recebe o identificador e gera os acessos do médico e do paciente.
+
+**09:10 – Marina:**
+Para o usuário isso precisa ser transparente. Não quero que ele tenha que criar conta em outro serviço.
+
+**09:10 – Lucas:**
+Não precisa. Podemos trabalhar com um token temporário para aquela consulta.
+
+**09:10 – Rafael:**
+Exatamente. E o token não pode ser reaproveitado para outra consulta.
+
+**09:10 – Fernanda:**
+Isso já gera alguns cenários: paciente tentando usar link de outra consulta, link inválido, consulta cancelada, consulta que ainda não começou.
+
+**09:11 – Marina:**
+Perfeito. Coloca isso como cenário de teste.
+
+**09:11 – Camila:**
+Na interface, quando ele clicar em "Entrar na teleconsulta", eu gostaria de ter uma tela intermediária antes da chamada.
+
+**09:11 – Rafael:**
+O que teria nessa tela?
+
+**09:11 – Camila:**
+Pré-visualização da câmera, confirmação do microfone e uma mensagem simples explicando que ele vai entrar na sala de atendimento.
+
+**09:12 – Lucas:**
+Essa validação de câmera e microfone pode ser feita no frontend.
+
+**09:12 – Fernanda:**
+Tem que tratar permissão negada também. Se o usuário bloquear câmera ou microfone, não podemos deixar só uma tela vazia.
+
+**09:12 – Camila:**
+Sim. Eu preparo o comportamento para os dois cenários: permissão concedida e permissão negada.
+
+**09:12 – Marina:**
+Ótimo. E ele precisa conseguir entrar só com áudio se a câmera não funcionar?
+
+**09:13 – Rafael:**
+Para o MVP, eu permitiria. Se exigirmos câmera obrigatoriamente, qualquer problema no dispositivo impede o atendimento inteiro.
+
+**09:13 – Fernanda:**
+Então requisito: câmera pode estar desligada, microfone precisa estar disponível para a consulta.
+
+**09:13 – Marina:**
+Fechado.
+
+**09:14 – Lucas:**
+Uma coisa: precisamos definir quem cria a sala. Quando o médico abre o atendimento ou antes?
+
+**09:14 – Rafael:**
+Eu criaria sob demanda. Quando o primeiro participante tentar acessar a teleconsulta, nosso backend verifica o agendamento e cria a sala caso ainda não exista.
+
+**09:15 – Lucas:**
+Melhor mesmo. Evita gerar sala para consulta que ninguém acessou.
+
+**09:15 – Marina:**
+E se o paciente entrar antes do médico?
+
+**09:15 – Camila:**
+Precisamos de uma sala de espera.
+
+**09:15 – Rafael:**
+Sim. O paciente entra e recebe o status de aguardando. Quando o médico entrar, a chamada é liberada.
+
+**09:16 – Camila:**
+Posso criar uma tela de espera com algo como "Aguarde, o profissional entrará em breve".
+
+**09:16 – Marina:**
+Sem prometer tempo, por favor. Não coloca "em alguns minutos".
+
+**09:16 – Camila:**
+Boa. Só informamos que ele está aguardando.
+
+**09:17 – Fernanda:**
+E se o médico nunca entrar?
+
+**09:17 – Marina:**
+Para esta primeira entrega, acho que não precisamos resolver automaticamente ausência do médico. Isso envolve regra de atendimento, suporte, reagendamento...
+
+**09:17 – Rafael:**
+Concordo. Isso vai para backlog futuro. Tecnicamente só precisamos mostrar que o paciente continua aguardando.
+
+**09:18 – Fernanda:**
+Ok. Vou registrar que tratamento automático de ausência do médico está fora do MVP.
+
+**09:18 – Lucas:**
+Falando em atraso, alguém já pediu o almoço? Porque ontem eu pedi quase uma hora e fiquei esperando até duas da tarde.
+
+**09:18 – Camila:**
+Eu trouxe comida hoje.
+
+**09:18 – Marina:**
+Lucas, você acabou de criar uma excelente demonstração do conceito de sala de espera.
+
+**09:18 – Rafael:**
+Só não vamos colocar rastreamento do almoço no escopo da teleconsulta.
+
+**09:19 – Lucas:**
+Justo. Voltando.
+
+**09:19 – Marina:**
+Quero falar da finalização da consulta. Quem encerra?
+
+**09:19 – Rafael:**
+Os dois podem sair da chamada, mas o médico deve ter a ação de finalizar o atendimento.
+
+**09:19 – Lucas:**
+Nesse momento eu atualizo o status da sessão.
+
+**09:20 – Marina:**
+Isso também precisa refletir no agendamento?
+
+**09:20 – Lucas:**
+Sim, mas precisamos tomar cuidado. Sair da chamada não necessariamente significa finalizar a consulta. O paciente pode cair e entrar novamente.
+
+**09:20 – Fernanda:**
+Isso é importante. Então "sair da chamada" e "finalizar atendimento" são duas ações diferentes.
+
+**09:20 – Rafael:**
+Exatamente.
+
+**09:21 – Camila:**
+Para o paciente eu colocaria apenas "Sair da chamada". Para o médico, "Sair" e "Finalizar atendimento".
+
+**09:21 – Marina:**
+Fechado.
+
+**09:21 – Fernanda:**
+Quando o médico finalizar, o paciente que tentar entrar novamente deve receber qual mensagem?
+
+**09:21 – Camila:**
+"Esta teleconsulta já foi encerrada."
+
+**09:22 – Marina:**
+Sim, objetiva.
+
+**09:22 – Lucas:**
+Vou precisar retornar esse status no backend também.
+
+**09:22 – Rafael:**
+Coloca junto com aquela mesma regra de disponibilidade que discutimos no começo. Não precisamos espalhar lógica em vários endpoints.
+
+**09:22 – Lucas:**
+Perfeito.
+
+**09:23 – Marina:**
+Tem mais alguma coisa obrigatória para o MVP?
+
+**09:23 – Camila:**
+Talvez chat durante a chamada?
+
+**09:23 – Rafael:**
+Eu deixaria fora agora. Isso aumenta bastante o escopo.
+
+**09:23 – Lucas:**
+Também voto por deixar fora.
+
+**09:23 – Fernanda:**
+Então chat fica explicitamente no backlog.
+
+**09:24 – Marina:**
+Perfeito. Gravação da consulta também está fora, certo?
+
+**09:24 – Rafael:**
+Com certeza. Além da parte técnica, envolve privacidade e armazenamento. Não colocaria nessa primeira versão.
+
+**09:24 – Marina:**
+Combinado. Compartilhamento de tela também não entra.
+
+**09:24 – Camila:**
+Beleza.
+
+**09:25 – Fernanda:**
+Eu queria falar de navegadores. Vamos testar quais?
+
+**09:25 – Rafael:**
+Para a primeira versão web, precisamos pelo menos Chrome e Edge nas versões atuais. Mobile browser eu prefiro validar depois.
+
+**09:25 – Marina:**
+Mas temos bastante acesso pelo celular.
+
+**09:26 – Camila:**
+Nesse caso não dá para ignorar completamente responsividade.
+
+**09:26 – Rafael:**
+Responsividade sim. Eu estou falando de homologação completa de todos os navegadores mobile. A interface deve ser responsiva, mas para essa primeira entrega formalizamos Chrome e Edge desktop como navegadores homologados.
+
+**09:26 – Marina:**
+Ok. Colocamos a experiência responsiva no desenvolvimento, mas ampliamos homologação de navegadores posteriormente.
+
+**09:27 – Fernanda:**
+Certo.
+
+**09:27 – Lucas:**
+Minha internet caiu três vezes ontem. Precisamos pensar em reconexão.
+
+**09:27 – Rafael:**
+Isso, sim, é relevante. Se perder conexão temporariamente, o usuário deve conseguir voltar para a mesma sessão sem gerar outra sala.
+
+**09:27 – Lucas:**
+Consigo controlar isso pelo identificador da teleconsulta.
+
+**09:28 – Camila:**
+E enquanto estiver tentando reconectar, mostramos uma mensagem em tela.
+
+**09:28 – Fernanda:**
+Vou incluir interrupção de rede nos testes.
+
+**09:28 – Marina:**
+Ótimo.
+
+**09:28 – Camila:**
+Falando em internet, vocês viram que trocaram a senha do Wi-Fi daqui?
+
+**09:28 – Fernanda:**
+Não.
+
+**09:28 – Rafael:**
+Depois vocês resolvem isso. Faltam dois minutos para terminar.
+
+**09:29 – Marina:**
+Vamos fechar então. Camila, você fica com os fluxos de entrada, pré-chamada, sala de espera, chamada, reconexão e encerramento.
+
+**09:29 – Camila:**
+Certo.
+
+**09:29 – Marina:**
+Lucas, backend da criação da sala, token de acesso, validação da teleconsulta, status de disponibilidade e finalização.
+
+**09:29 – Lucas:**
+Isso. Também vou tratar a reutilização da mesma sala em caso de reconexão.
+
+**09:30 – Marina:**
+Rafael, você acompanha a integração com o provedor de vídeo e fecha o desenho técnico com o Lucas.
+
+**09:30 – Rafael:**
+Sim. Também vou documentar as decisões de arquitetura e os pontos de segurança do token.
+
+**09:30 – Marina:**
+Fernanda, critérios de aceite e cenários de teste.
+
+**09:30 – Fernanda:**
+Vou considerar permissões de câmera e microfone, acesso antes do horário, consulta encerrada, consulta cancelada, link inválido, entrada antes do médico, reconexão e finalização.
+
+**09:31 – Marina:**
+Perfeito. E reforçando o que ficou fora: chat, gravação, compartilhamento de tela, tratamento automático de ausência do médico e homologação completa de navegadores mobile.
+
+**09:31 – Rafael:**
+Correto.
+
+**09:31 – Camila:**
+E pagamento, obviamente, não entra nessa discussão.
+
+**09:31 – Marina:**
+Sim. O agendamento já existe e não estamos alterando esse fluxo.
+
+**09:32 – Lucas:**
+Quando vocês querem isso pronto?
+
+**09:32 – Marina:**
+Hoje eu quero apenas as tarefas estruturadas. Depois que tivermos a estimativa técnica, fechamos o prazo da sprint. Não quero inventar prazo antes disso.
+
+**09:32 – Rafael:**
+Perfeito.
+
+**09:32 – Marina:**
+Então fechamos. Obrigada, pessoal.
+
+**09:32 – Lucas:**
+Agora podemos voltar para o futebol?
+
+**09:32 – Rafael:**
+Não.
+
+**09:32 – Camila:**
+Reunião encerrada antes que comece outra discussão.
+
+---
+
+## Resultado esperado da reunião
+
+A transcrição foi construída propositalmente com:
+
+* definições claras de escopo;
+* decisões técnicas;
+* requisitos funcionais;
+* critérios de aceite;
+* atribuições de responsabilidade;
+* itens que ficaram fora do MVP;
+* questões que foram discutidas e descartadas;
+* mudanças de assunto;
+* conversas sem relação com o produto;
+* comentários informais que não devem virar tarefas;
+* pontos que ainda dependem de decisão posterior.
+
+Isso cria um input mais realista para testar se o **Agente de Transcrição** consegue diferenciar informação relevante de ruído antes de entregar o conteúdo ao **Agente Agilista**.
