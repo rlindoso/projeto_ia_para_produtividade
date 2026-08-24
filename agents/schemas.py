@@ -80,3 +80,32 @@ class EnviarMensagemSlackRequest(BaseModel):
         None,
         description="ID do canal de destino, por exemplo C0123456789; None para usar o canal padrão.",
     )
+
+
+class ConfiguracaoProjeto(BaseModel):
+    status: str = Field(..., description="Status no Kanban, ex: Todo, In Progress, Done, Backlog.")
+    priority: str = Field(..., description="Prioridade: High, Medium ou Low.")
+    type: str = Field(..., description="Tipo do item: Epic, Feature, Story, Bug ou Task.")
+    labels: list[str] = Field(default_factory=list, description="Labels do GitHub, ex: ['epic', 'backend'].")
+
+
+class IssueBacklog(BaseModel):
+    tipo: str = Field(..., description="Tipo do item: epic, feature, story, bug ou task.")
+    titulo: str = Field(..., description="Título da issue no GitHub, curto e direto.")
+    epic_pai: str | None = Field(
+        None,
+        description="Título do épico pai ao qual esta issue pertence; None se for o próprio épico.",
+    )
+    configuracao_projeto: ConfiguracaoProjeto
+    corpo_issue: str = Field(
+        ...,
+        description="Corpo completo da issue em GitHub Flavored Markdown, pronto para colar no GitHub.",
+    )
+
+
+class BacklogEstruturado(BaseModel):
+    resumo_reuniao: str = Field(..., description="Resumo executivo dos pontos discutidos na reunião.")
+    issues: list[IssueBacklog] = Field(
+        ...,
+        description="Lista de issues geradas, ordenadas: épicos primeiro, depois features e stories filhas.",
+    )
