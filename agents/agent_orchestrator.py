@@ -17,9 +17,15 @@ from functools import lru_cache
 
 from langchain_core.tools import tool
 
+from agents.agent_agile_coach import build_agent as build_agile_coach_agent
 from agents.agent_github import build_agent as build_github_agent
 from agents.agent_slack import build_agent as build_slack_agent
 from agents.base import Agent, load_chat_model
+
+
+@lru_cache(maxsize=1)
+def _agente_agile_coach():
+    return build_agile_coach_agent()
 
 
 @lru_cache(maxsize=1)
@@ -30,6 +36,25 @@ def _agente_github():
 @lru_cache(maxsize=1)
 def _agente_slack():
     return build_slack_agent()
+
+
+@tool
+def agente_agile_coach(solicitacao: str) -> str:
+    """Delega ao Agente Agile Coach, especialista em transformar reuniões em backlog estruturado para GitHub Projects.
+
+    Use quando o usuário fornecer anotações, transcrições ou resumos de reunião e pedir para gerar
+    épicos, features ou stories prontos para criar no GitHub. Passe o texto completo da reunião;
+    a resposta retorna um backlog estruturado com títulos, corpos GFM e configurações do Project.
+    """
+    resultado = _agente_agile_coach().invoke(solicitacao)
+    issues_resumo = "\n".join(
+        f"- [{i.tipo.upper()}] {i.titulo}" for i in resultado.issues
+    )
+    return (
+        f"Resumo da reunião: {resultado.resumo_reuniao}\n\n"
+        f"Issues geradas ({len(resultado.issues)}):\n{issues_resumo}\n\n"
+        f"Backlog completo disponível para criação no GitHub."
+    )
 
 
 @tool
@@ -56,6 +81,7 @@ def agente_slack(solicitacao: str) -> str:
 
 
 AGENTES_ORQUESTRADOS = [
+    agente_agile_coach,
     agente_github,
     agente_slack,
 ]
@@ -65,6 +91,7 @@ SYSTEM_AGENT_ORQUESTRADOR = """Você é um Agente Orquestrador de um pipeline de
 Você não executa operações diretamente: seu papel é analisar a mensagem do usuário e delegar o trabalho aos agentes especialistas disponíveis como ferramentas.
 
 Agentes disponíveis:
+- agente_agile_coach: transforma anotações ou transcrições de reunião em backlog estruturado (épicos, features, stories) com corpo GFM e configurações para GitHub Projects. Use quando o usuário fornecer texto de reunião e pedir geração de tarefas/backlog.
 - agente_github: gerencia Issues e Projects (Kanban) no GitHub. Use para criar, consultar, atualizar, fechar ou comentar em issues e para organizar cards no quadro.
 - agente_slack: comunica a equipe via Slack. Use para enviar mensagens, notificações e resumos.
 
