@@ -379,7 +379,7 @@ Agente Orquestrador (grafo LangGraph)
 | `agents/schemas.py` | Modelos Pydantic para extração estruturada de parâmetros das tools |
 | `agents/agent_github.py` | Especialista em Issues/Projects; expõe `GithubTools` como `@tool`s |
 | `agents/agent_slack.py` | Especialista em comunicação; expõe `SlackTools` como `@tool`s |
-| `agents/agent_orquestrador.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS`; ao final de ações executadas, aciona o Agente Slack com o resumo |
+| `agents/agent_orchestrator.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS`; ao final de ações executadas, aciona o Agente Slack com o resumo |
 | `tools/github_tools.py` | Cliente de alto nível do GitHub (Issues via REST, Projects/Kanban via `gh`) |
 | `tools/slack_tools.py` | Cliente de alto nível do Slack (Web API, canal padrão via `SLACK_DEFAULT_CHANNEL_ID`) |
 
@@ -408,7 +408,7 @@ Isso evita issues e cards duplicados quando o agente repete chamadas.
 
 1. Crie `agents/agent_<nome>.py` usando `Agent`/`load_chat_model()` de `agents/base.py`.
 2. Envolva-o em uma `@tool` no orquestrador (como `agente_github`).
-3. Registre a tool em `AGENTES_ORQUESTRADOS` (`agents/agent_orquestrador.py`).
+3. Registre a tool em `AGENTES_ORQUESTRADOS` (`agents/agent_orchestrator.py`).
 
 ---
 
@@ -423,7 +423,7 @@ projeto_ia_para_produtividade/
 │   ├── schemas.py               # Modelos Pydantic de extração de parâmetros
 │   ├── agent_github.py          # ✅ Agente especialista em Issues/Projects
 │   ├── agent_slack.py           # ✅ Agente especialista em comunicação no Slack
-│   ├── agent_orquestrador.py    # ✅ Orquestra agentes especialistas como tools
+│   ├── agent_orchestrator.py    # ✅ Orquestra agentes especialistas como tools
 │   └── agent_transcricao.py     # 🔜 planejado
 │
 ├── prompts/
@@ -512,7 +512,7 @@ Configure o `.env` conforme a seção anterior.
 O orquestrador analisa a solicitação e delega ao especialista adequado:
 
 ```bash
-python -m agents.agent_orquestrador "Precisamos documentar a API. Crie essa tarefa no GitHub e coloque no Backlog do Kanban."
+python -m agents.agent_orchestrator "Precisamos documentar a API. Crie essa tarefa no GitHub e coloque no Backlog do Kanban."
 ```
 
 Saída esperada (rastreamento das tools + resposta final):
@@ -544,7 +544,7 @@ Também é possível aceitar a pergunta pela linha de comando livremente — o t
 ### Uso programático
 
 ```python
-from agents.agent_orquestrador import build_orchestrator
+from agents.agent_orchestrator import build_orchestrator
 from agents.agent_github import build_agent
 
 orquestrador = build_orchestrator()
