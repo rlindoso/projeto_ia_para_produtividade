@@ -44,6 +44,17 @@ def extrair_parametros(
     return chain.invoke([HumanMessage(content=prompt)])
 
 
+def anunciar_ferramenta(nome_ferramenta: str, parametros: BaseModel | None = None) -> None:
+    """Imprime qual ferramenta foi utilizada e com quais parâmetros."""
+    if parametros is None:
+        print(f"Ferramenta {nome_ferramenta} utilizada sem parametros")
+        return
+    print(
+        f"Ferramenta {nome_ferramenta} utilizada com os parametros: "
+        f"{parametros.model_dump_json(ensure_ascii=False)}"
+    )
+
+
 class Agent:
     """Orquestra um modelo LangChain e tools por meio de um grafo LangGraph."""
 

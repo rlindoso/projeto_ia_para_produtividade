@@ -117,7 +117,7 @@ O sistema é dividido em **4 agentes especializados**:
 
 # 🤖 Agentes
 
-> **Status da implementação:** ✅ **Agente GitHub** e ✅ **Agente Orquestrador** já implementados em `agents/`, seguindo o padrão LangGraph. Os demais agentes representam a visão alvo do pipeline e serão adicionados como novos especialistas orquestrados.
+> **Status da implementação:** ✅ **Agente GitHub**, ✅ **Agente Slack** e ✅ **Agente Orquestrador** já implementados em `agents/`, seguindo o padrão LangGraph. Os demais agentes representam a visão alvo do pipeline e serão adicionados como novos especialistas orquestrados.
 
 ## 1. 🎙️ Agente de Transcrição e Contexto
 
@@ -347,7 +347,7 @@ As tarefas estão disponíveis no Kanban.
 
 ---
 
-# 🕸️ Implementação atual: Orquestrador + Agente GitHub
+# 🕸️ Implementação atual: Orquestrador + Agentes GitHub e Slack
 
 A implementação segue o padrão: um grafo **LangGraph** que alterna entre o nó `agent` (modelo com tool calling) e o nó `tools` (execução das ferramentas) até a resposta final.
 
@@ -355,26 +355,33 @@ A implementação segue o padrão: um grafo **LangGraph** que alterna entre o n�
 Usuário
    ↓
 Agente Orquestrador (grafo LangGraph)
-   │  tools: [agente_github]        ← agentes especialistas como ferramentas
-   ▼
-Agente GitHub (grafo LangGraph)
-   │  tools: [criar_issue, mover_no_kanban, ...]
-   ▼
-GithubTools (tools/github_tools.py)
+   │  tools: [agente_github, agente_slack]   ← agentes especialistas como ferramentas
    │
-   ├── REST API    → Issues
-   └── gh CLI      → Projects v2 / Kanban
+   ├──► Agente GitHub (grafo LangGraph)
+   │       │  tools: [criar_issue, mover_no_kanban, ...]
+   │       ▼
+   │    GithubTools (tools/github_tools.py)
+   │       ├── REST API    → Issues
+   │       └── gh CLI      → Projects v2 / Kanban
+   │
+   └──► Agente Slack (grafo LangGraph)   ← chamado ao final, com o resumo
+           │  tools: [enviar_mensagem]
+           ▼
+        SlackTools (tools/slack_tools.py)
+           └── Slack Web API → chat.postMessage
 ```
 
 ### Componentes
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `agents/base.py` | `AgentState`, classe `Agent` (grafo), `load_chat_model()` e `extrair_parametros()` |
+| `agents/base.py` | `AgentState`, classe `Agent` (grafo), `load_chat_model()`, `extrair_parametros()` e `anunciar_ferramenta()` |
 | `agents/schemas.py` | Modelos Pydantic para extração estruturada de parâmetros das tools |
 | `agents/agent_github.py` | Especialista em Issues/Projects; expõe `GithubTools` como `@tool`s |
-| `agents/agent_orquestrador.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS` |
+| `agents/agent_slack.py` | Especialista em comunicação; expõe `SlackTools` como `@tool`s |
+| `agents/agent_orquestrador.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS`; ao final de ações executadas, aciona o Agente Slack com o resumo |
 | `tools/github_tools.py` | Cliente de alto nível do GitHub (Issues via REST, Projects/Kanban via `gh`) |
+| `tools/slack_tools.py` | Cliente de alto nível do Slack (Web API, canal padrão via `SLACK_DEFAULT_CHANNEL_ID`) |
 
 ### Extração estruturada de parâmetros
 
@@ -415,6 +422,7 @@ projeto_ia_para_produtividade/
 │   ├── base.py                  # AgentState + classe Agent (grafo LangGraph)
 │   ├── schemas.py               # Modelos Pydantic de extração de parâmetros
 │   ├── agent_github.py          # ✅ Agente especialista em Issues/Projects
+│   ├── agent_slack.py           # ✅ Agente especialista em comunicação no Slack
 │   ├── agent_orquestrador.py    # ✅ Orquestra agentes especialistas como tools
 │   └── agent_transcricao.py     # 🔜 planejado
 │
@@ -423,6 +431,7 @@ projeto_ia_para_produtividade/
 │
 ├── tools/
 │   ├── github_tools.py          # GithubTools: Issues (REST) + Projects (gh CLI)
+│   ├── slack_tools.py           # SlackTools: Web API (chat.postMessage)
 │   └── docs/                    # Guias de configuração das ferramentas
 │
 ├── docs/
@@ -463,6 +472,9 @@ GITHUB_TOKEN=github_pat_xxxxxxxxx
 GITHUB_OWNER=rlindoso
 GITHUB_REPOSITORY=projeto_ia_para_produtividade
 GITHUB_PROJECT_ID=PVT_xxxxxxxxx
+
+SLACK_BOT_TOKEN=xoxb_xxxxxxxxx
+SLACK_DEFAULT_CHANNEL_ID=C0BS9C37QRJ
 ```
 
 `OPENAI_API_KEY` é usada pelo modelo dos agentes (`gpt-4o-mini` por padrão, configurável em `OPENAI_MODEL`).
@@ -519,6 +531,12 @@ Sem passar pelo orquestrador:
 ```bash
 python -m agents.agent_github "Crie uma issue 'Revisar o README' e coloque em Todo."
 python -m agents.agent_github "Consulte a issue #12"
+```
+
+### Agente Slack direto
+
+```bash
+python -m agents.agent_slack "Avise a equipe que o deploy de hoje foi concluído."
 ```
 
 Também é possível aceitar a pergunta pela linha de comando livremente — o texto após o módulo é repassado ao agente; sem argumentos, um exemplo padrão é executado.
@@ -605,7 +623,7 @@ Essa separação facilita testes, manutenção e evolução do sistema.
 - [ ] Definir categorias e prioridades.
 - [ ] Integrar agente de tasks com o GitHub.
 - [x] Automatizar criação e organização das Issues.
-- [ ] Integrar comunicação com Slack (agente especialista).
+- [x] Integrar comunicação com Slack (agente especialista).
 - [x] Criar um agente/orquestrador do pipeline.
 - [ ] Adicionar tratamento de erros e retries.
 - [ ] Adicionar logs e observabilidade.

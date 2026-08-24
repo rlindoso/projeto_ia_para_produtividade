@@ -72,3 +72,11 @@ class CriarIssueNoProjectRequest(BaseModel):
         description="Coluna inicial no Kanban, por exemplo Todo; None se o usuário não informar.",
     )
     labels: list[str] | None = Field(None, description="Rótulos da issue, por exemplo bug ou documentation.")
+
+
+class EnviarMensagemSlackRequest(BaseModel):
+    message: str = Field(..., description="Texto da mensagem que será enviada ao canal do Slack.")
+    channel: str | None = Field(
+        None,
+        description="ID do canal de destino, por exemplo C0123456789; None para usar o canal padrão.",
+    )

@@ -12,7 +12,7 @@ from functools import lru_cache
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
-from agents.base import Agent, extrair_parametros, load_chat_model
+from agents.base import Agent, anunciar_ferramenta, extrair_parametros, load_chat_model
 from agents.schemas import (
     AtualizarIssueRequest,
     ComentarIssueRequest,
@@ -25,16 +25,6 @@ from agents.schemas import (
 from tools.github_tools import GithubTools
 
 github = GithubTools()
-
-
-def _anunciar(nome_ferramenta: str, parametros: BaseModel | None = None) -> None:
-    if parametros is None:
-        print(f"Ferramenta {nome_ferramenta} utilizada sem parametros")
-        return
-    print(
-        f"Ferramenta {nome_ferramenta} utilizada com os parametros: "
-        f"{parametros.model_dump_json(ensure_ascii=False)}"
-    )
 
 
 def _exigir_numero_issue(params: BaseModel) -> int:
@@ -50,7 +40,7 @@ def _exigir_numero_issue(params: BaseModel) -> int:
 @tool
 def obter_info_repositorio(mensagem_usuario: str) -> dict:
     """Consulta as informações gerais do repositório configurado."""
-    _anunciar("obter_info_repositorio")
+    anunciar_ferramenta("obter_info_repositorio")
     return github.get_repo_info()
 
 
@@ -63,7 +53,7 @@ def consultar_issue(mensagem_usuario: str) -> dict:
         "'#123', 'issue 123' ou 'issue número 123'. Se não houver número, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("consultar_issue", params)
+    anunciar_ferramenta("consultar_issue", params)
     return github.get_issue(_exigir_numero_issue(params))
 
 
@@ -78,7 +68,7 @@ def criar_issue(mensagem_usuario: str) -> dict:
     )
     if not params.title.strip():
         raise ValueError("Não foi possível identificar o título da issue.")
-    _anunciar("criar_issue", params)
+    anunciar_ferramenta("criar_issue", params)
     return github.create_issue(
         params.title,
         params.body,
@@ -98,7 +88,7 @@ def atualizar_issue(mensagem_usuario: str) -> dict:
         "de issue na mensagem, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("atualizar_issue", params)
+    anunciar_ferramenta("atualizar_issue", params)
     return github.update_issue(
         _exigir_numero_issue(params),
         params.title,
@@ -118,7 +108,7 @@ def fechar_issue(mensagem_usuario: str) -> dict:
         "Se não houver número de issue na mensagem, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("fechar_issue", params)
+    anunciar_ferramenta("fechar_issue", params)
     return github.close_issue(_exigir_numero_issue(params), params.reason)
 
 
@@ -131,7 +121,7 @@ def comentar_issue(mensagem_usuario: str) -> dict:
         "publicar. Se não houver número de issue na mensagem, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("comentar_issue", params)
+    anunciar_ferramenta("comentar_issue", params)
     return github.add_comment(_exigir_numero_issue(params), params.body)
 
 
@@ -144,14 +134,14 @@ def adicionar_ao_project(mensagem_usuario: str) -> dict:
         "Se não houver número na mensagem, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("adicionar_ao_project", params)
+    anunciar_ferramenta("adicionar_ao_project", params)
     return github.add_issue_to_project(_exigir_numero_issue(params))
 
 
 @tool
 def listar_campos_project(mensagem_usuario: str) -> list[dict]:
     """Lista os campos do Project, incluindo as opções válidas do campo Status do Kanban."""
-    _anunciar("listar_campos_project")
+    anunciar_ferramenta("listar_campos_project")
     return github.get_project_fields()
 
 
@@ -165,7 +155,7 @@ def mover_no_kanban(mensagem_usuario: str) -> dict:
         "na mensagem, retorne null.",
         mensagem_usuario,
     )
-    _anunciar("mover_no_kanban", params)
+    anunciar_ferramenta("mover_no_kanban", params)
     return github.move_issue(_exigir_numero_issue(params), params.status)
 
 
@@ -180,7 +170,7 @@ def criar_issue_no_project(mensagem_usuario: str) -> dict:
     )
     if not params.title.strip():
         raise ValueError("Não foi possível identificar o título da issue.")
-    _anunciar("criar_issue_no_project", params)
+    anunciar_ferramenta("criar_issue_no_project", params)
     return github.create_issue_and_add_to_project(
         title=params.title,
         body=params.body,
