@@ -507,13 +507,25 @@ gh auth login
 
 Configure o `.env` conforme a seção anterior.
 
-### Via Agente Orquestrador (recomendado)
+### Script interativo (recomendado)
 
-O orquestrador analisa a solicitação e delega ao especialista adequado:
+Na raiz do projeto, execute sem parâmetros — o script mostra um resumo, carrega os agentes e pergunta o que deve ser feito:
+
+```bash
+python main.py
+```
+
+Digite o pedido e aguarde; a resposta final é impressa no terminal (com o rastreamento das ferramentas utilizadas). Enter vazio ou `Ctrl+C` encerra.
+
+### Via linha de comando
+
+Também é possível passar a solicitação diretamente ao orquestrador:
 
 ```bash
 python -m agents.agent_orchestrator "Precisamos documentar a API. Crie essa tarefa no GitHub e coloque no Backlog do Kanban."
 ```
+
+O orquestrador analisa a solicitação e delega ao especialista adequado:
 
 Saída esperada (rastreamento das tools + resposta final):
 
