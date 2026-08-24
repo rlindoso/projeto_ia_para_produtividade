@@ -117,6 +117,8 @@ O sistema é dividido em **4 agentes especializados**:
 
 # 🤖 Agentes
 
+> **Status da implementação:** ✅ **Agente GitHub** e ✅ **Agente Orquestrador** já implementados em `agents/`, seguindo o padrão LangGraph. Os demais agentes representam a visão alvo do pipeline e serão adicionados como novos especialistas orquestrados.
+
 ## 1. 🎙️ Agente de Transcrição e Contexto
 
 É a porta de entrada do pipeline.
@@ -345,26 +347,86 @@ As tarefas estão disponíveis no Kanban.
 
 ---
 
+# 🕸️ Implementação atual: Orquestrador + Agente GitHub
+
+A implementação segue o padrão: um grafo **LangGraph** que alterna entre o nó `agent` (modelo com tool calling) e o nó `tools` (execução das ferramentas) até a resposta final.
+
+```text
+Usuário
+   ↓
+Agente Orquestrador (grafo LangGraph)
+   │  tools: [agente_github]        ← agentes especialistas como ferramentas
+   ▼
+Agente GitHub (grafo LangGraph)
+   │  tools: [criar_issue, mover_no_kanban, ...]
+   ▼
+GithubTools (tools/github_tools.py)
+   │
+   ├── REST API    → Issues
+   └── gh CLI      → Projects v2 / Kanban
+```
+
+### Componentes
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `agents/base.py` | `AgentState`, classe `Agent` (grafo), `load_chat_model()` e `extrair_parametros()` |
+| `agents/schemas.py` | Modelos Pydantic para extração estruturada de parâmetros das tools |
+| `agents/agent_github.py` | Especialista em Issues/Projects; expõe `GithubTools` como `@tool`s |
+| `agents/agent_orquestrador.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS` |
+| `tools/github_tools.py` | Cliente de alto nível do GitHub (Issues via REST, Projects/Kanban via `gh`) |
+
+### Extração estruturada de parâmetros
+
+Cada tool recebe a mensagem em linguagem natural e extrai os parâmetros com uma classe Pydantic + `with_structured_output`, antes de chamar a API:
+
+```python
+params: MoverNoKanbanRequest = extrair_parametros(
+    MoverNoKanbanRequest,
+    "Extraia o número da issue e a coluna de destino no Kanban...",
+    mensagem_usuario,
+)
+```
+
+Se um parâmetro obrigatório não estiver na mensagem, o schema retorna `null` e a tool falha com erro explícito — nunca inventa valores.
+
+### Idempotência
+
+- `criar_issue` / `criar_issue_no_project` usam `skip_existing=True`: se já existe issue aberta com o mesmo título, reutilizam-na (retorno marcado com `"ja_existia": true`).
+- `add_issue_to_project` só adiciona o card se a issue ainda não estiver no Project.
+
+Isso evita issues e cards duplicados quando o agente repete chamadas.
+
+### Como adicionar um novo especialista
+
+1. Crie `agents/agent_<nome>.py` usando `Agent`/`load_chat_model()` de `agents/base.py`.
+2. Envolva-o em uma `@tool` no orquestrador (como `agente_github`).
+3. Registre a tool em `AGENTES_ORQUESTRADOS` (`agents/agent_orquestrador.py`).
+
+---
+
 # 📦 Estrutura do projeto
 
 ```text
 projeto_ia_para_produtividade/
 │
 ├── agents/
-│   ├── agente_transcricao/
-│   ├── agente_tasks/
-│   ├── agente_github/
-│   └── agente_slack/
+│   ├── __init__.py
+│   ├── base.py                  # AgentState + classe Agent (grafo LangGraph)
+│   ├── schemas.py               # Modelos Pydantic de extração de parâmetros
+│   ├── agent_github.py          # ✅ Agente especialista em Issues/Projects
+│   ├── agent_orquestrador.py    # ✅ Orquestra agentes especialistas como tools
+│   └── agent_transcricao.py     # 🔜 planejado
 │
 ├── prompts/
-│   ├── ...
+│   └── README.md
 │
 ├── tools/
-│   ├── github_tools.py
-│   ├── ...
+│   ├── github_tools.py          # GithubTools: Issues (REST) + Projects (gh CLI)
+│   └── docs/                    # Guias de configuração das ferramentas
 │
+├── docs/
 ├── .env.example
-├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
@@ -376,7 +438,8 @@ projeto_ia_para_produtividade/
 # 🛠️ Tecnologias
 
 - 🐍 Python
-- 🤖 LLM / agentes de IA
+- 🦜 LangChain + LangGraph (grafos de agentes)
+- 🤖 OpenAI API (`gpt-4o-mini` por padrão)
 - 🎙️ Transcrição de áudio
 - 🐙 GitHub REST API
 - 🐙 GitHub CLI (`gh`)
@@ -393,11 +456,16 @@ Crie um arquivo `.env` baseado no `.env.example`.
 Exemplo:
 
 ```env
+OPENAI_API_KEY=sk_xxxxxxxxx
+OPENAI_MODEL=gpt-4o-mini
+
 GITHUB_TOKEN=github_pat_xxxxxxxxx
 GITHUB_OWNER=rlindoso
 GITHUB_REPOSITORY=projeto_ia_para_produtividade
 GITHUB_PROJECT_ID=PVT_xxxxxxxxx
 ```
+
+`OPENAI_API_KEY` é usada pelo modelo dos agentes (`gpt-4o-mini` por padrão, configurável em `OPENAI_MODEL`).
 
 O token utilizado pela API do GitHub deve possuir as permissões necessárias para as operações de Issues.
 
@@ -418,19 +486,57 @@ Instale as dependências:
 pip install -r requirements.txt
 ```
 
-Verifique o GitHub CLI:
+Verifique o GitHub CLI e autentique (necessário para o Kanban):
 
 ```bash
 gh --version
-```
-
-Autentique:
-
-```bash
 gh auth login
 ```
 
-Depois execute o pipeline conforme o agente/orquestrador implementado.
+Configure o `.env` conforme a seção anterior.
+
+### Via Agente Orquestrador (recomendado)
+
+O orquestrador analisa a solicitação e delega ao especialista adequado:
+
+```bash
+python -m agents.agent_orquestrador "Precisamos documentar a API. Crie essa tarefa no GitHub e coloque no Backlog do Kanban."
+```
+
+Saída esperada (rastreamento das tools + resposta final):
+
+```text
+Ferramenta 'agente_github' chamada com os argumentos: {'solicitacao': '...'}
+Ferramenta 'criar_issue_no_project' chamada com os argumentos: {'mensagem_usuario': '...'}
+Ferramenta criar_issue_no_project utilizada com os parametros: {"title":"Documentar a API","status":"Backlog",...}
+A tarefa foi criada: https://github.com/owner/repo/issues/12 ...
+```
+
+### Agente GitHub direto
+
+Sem passar pelo orquestrador:
+
+```bash
+python -m agents.agent_github "Crie uma issue 'Revisar o README' e coloque em Todo."
+python -m agents.agent_github "Consulte a issue #12"
+```
+
+Também é possível aceitar a pergunta pela linha de comando livremente — o texto após o módulo é repassado ao agente; sem argumentos, um exemplo padrão é executado.
+
+### Uso programático
+
+```python
+from agents.agent_orquestrador import build_orchestrator
+from agents.agent_github import build_agent
+
+orquestrador = build_orchestrator()
+resultado = orquestrador.invoke("Crie uma issue para revisar os testes e coloque no Kanban")
+print(resultado["messages"][-1].content)
+
+agente_github = build_agent()
+resultado = agente_github.invoke("Mova a issue #12 para In Progress")
+print(resultado["messages"][-1].content)
+```
 
 ---
 
@@ -498,9 +604,9 @@ Essa separação facilita testes, manutenção e evolução do sistema.
 - [ ] Implementar agente de criação de tasks.
 - [ ] Definir categorias e prioridades.
 - [ ] Integrar agente de tasks com o GitHub.
-- [ ] Automatizar criação e organização das Issues.
-- [ ] Integrar comunicação com Slack.
-- [ ] Criar um agente/orquestrador do pipeline.
+- [x] Automatizar criação e organização das Issues.
+- [ ] Integrar comunicação com Slack (agente especialista).
+- [x] Criar um agente/orquestrador do pipeline.
 - [ ] Adicionar tratamento de erros e retries.
 - [ ] Adicionar logs e observabilidade.
 - [ ] Criar testes automatizados para as Tools.

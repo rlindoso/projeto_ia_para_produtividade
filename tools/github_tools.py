@@ -160,6 +160,27 @@ class GithubTools:
             "GET", f"/repos/{self._repository_path(repository)}/issues/{issue_number}"
         )
 
+    def find_issue_by_title(
+        self,
+        title: str,
+        state: str = "open",
+        repository: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Busca uma issue aberta/fechada com título igual (ignorando maiúsculas)."""
+        issues = self._rest_request(
+            "GET",
+            f"/repos/{self._repository_path(repository)}/issues",
+            params={"state": state, "per_page": 100},
+        )
+        wanted = title.strip().casefold()
+        for issue in issues:
+            # O endpoint de issues também retorna pull requests.
+            if "pull_request" in issue:
+                continue
+            if issue.get("title", "").strip().casefold() == wanted:
+                return issue
+        return None
+
     def create_issue(
         self,
         title: str,
@@ -167,8 +188,18 @@ class GithubTools:
         labels: list[str] | None = None,
         assignees: list[str] | None = None,
         repository: str | None = None,
+        skip_existing: bool = False,
     ) -> dict[str, Any]:
-        """Cria uma issue e retorna os dados fornecidos pela API do GitHub."""
+        """Cria uma issue e retorna os dados fornecidos pela API do GitHub.
+
+        Com ``skip_existing=True``, se já existir uma issue (no estado
+        informado) com o mesmo título, retorna-a sem criar outra, com a
+        marcação ``"ja_existia": True`` no resultado.
+        """
+        if skip_existing:
+            existing = self.find_issue_by_title(title, repository=repository)
+            if existing:
+                return {**existing, "ja_existia": True}
         payload: dict[str, Any] = {"title": title}
         if body is not None:
             payload["body"] = body
@@ -249,15 +280,24 @@ class GithubTools:
             f"https://github.com/{repository_path}/issues/{issue_number}"
         )
 
-        self._gh(
-            "project",
-            "item-add",
-            str(project_number),
-            "--owner",
-            owner,
-            "--url",
-            issue_url,
-        )
+        # Operação idempotente: se o card já existe, não duplica.
+        try:
+            self._get_project_item(
+                issue_number=issue_number,
+                project_number=project_number,
+                owner=owner,
+                repository=repository,
+            )
+        except RuntimeError:
+            self._gh(
+                "project",
+                "item-add",
+                str(project_number),
+                "--owner",
+                owner,
+                "--url",
+                issue_url,
+            )
 
         return {
             "issue_number": issue_number,
@@ -442,16 +482,21 @@ class GithubTools:
         status: str | None = None,
         labels: list[str] | None = None,
         assignees: list[str] | None = None,
-        project_id: str | None = None,
         repository: str | None = None,
+        skip_existing: bool = True,
     ) -> dict[str, Any]:
-        """Cria uma issue, adiciona-a ao Project e, opcionalmente, define o status."""
+        """Cria uma issue, adiciona-a ao Project e, opcionalmente, define o status.
+
+        Por padrão (``skip_existing=True``), se já existir issue com o mesmo
+        título, reutiliza-a em vez de criar duplicata.
+        """
         issue = self.create_issue(
             title,
             body,
             labels,
             assignees,
             repository,
+            skip_existing=skip_existing,
         )
 
         item = self.add_issue_to_project(
@@ -463,6 +508,6 @@ class GithubTools:
         result: dict[str, Any] = {"issue": issue, "project_item": item}
         if status is not None:
             result["move"] = self.move_issue(
-                issue["number"], status, project_id, repository
+                issue["number"], status, repository=repository
             )
         return result
