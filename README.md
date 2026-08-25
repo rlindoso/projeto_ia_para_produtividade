@@ -117,7 +117,7 @@ O sistema é dividido em **4 agentes especializados**:
 
 # 🤖 Agentes
 
-> **Status da implementação:** ✅ **Agente GitHub**, ✅ **Agente Slack** e ✅ **Agente Orquestrador** já implementados em `agents/`, seguindo o padrão LangGraph. Os demais agentes representam a visão alvo do pipeline e serão adicionados como novos especialistas orquestrados.
+> **Status da implementação:** ✅ **Agente de Transcrição**, ✅ **Agente GitHub**, ✅ **Agente Slack** e ✅ **Agente Orquestrador** já implementados em `agents/`, seguindo o padrão LangGraph (`SYSTEM_AGENT_*` + tools). O Agente de Tasks representa a próxima etapa do pipeline.
 
 ## 1. 🎙️ Agente de Transcrição e Contexto
 
@@ -355,7 +355,14 @@ A implementação segue o padrão: um grafo **LangGraph** que alterna entre o n�
 Usuário
    ↓
 Agente Orquestrador (grafo LangGraph)
-   │  tools: [agente_github, agente_slack]   ← agentes especialistas como ferramentas
+   │  tools: [agente_transcricao, agente_github, agente_slack]
+   │
+   ├──► Agente Transcrição (grafo LangGraph)
+   │       │  tools: [transcrever_audio, carregar_transcricao, estruturar_conversa]
+   │       ▼
+   │    TranscriptionTools (tools/transcription_tools.py)
+   │       ├── Whisper     → áudio → texto
+   │       └── arquivo     → texto da transcrição
    │
    ├──► Agente GitHub (grafo LangGraph)
    │       │  tools: [criar_issue, mover_no_kanban, ...]
@@ -377,9 +384,11 @@ Agente Orquestrador (grafo LangGraph)
 |---|---|
 | `agents/base.py` | `AgentState`, classe `Agent` (grafo), `load_chat_model()`, `extrair_parametros()` e `anunciar_ferramenta()` |
 | `agents/schemas.py` | Modelos Pydantic para extração estruturada de parâmetros das tools |
+| `agents/agent_transcricao.py` | Especialista em limpar conversas; expõe `TranscriptionTools` como `@tool`s e devolve o prompt para o próximo agente |
 | `agents/agent_github.py` | Especialista em Issues/Projects; expõe `GithubTools` como `@tool`s |
 | `agents/agent_slack.py` | Especialista em comunicação; expõe `SlackTools` como `@tool`s |
 | `agents/agent_orchestrator.py` | Delega solicitações aos agentes especialistas registrados em `AGENTES_ORQUESTRADOS`; ao final de ações executadas, aciona o Agente Slack com o resumo |
+| `tools/transcription_tools.py` | Cliente de alto nível da transcrição (Whisper + leitura de arquivos de texto) |
 | `tools/github_tools.py` | Cliente de alto nível do GitHub (Issues via REST, Projects/Kanban via `gh`) |
 | `tools/slack_tools.py` | Cliente de alto nível do Slack (Web API, canal padrão via `SLACK_DEFAULT_CHANNEL_ID`) |
 
@@ -424,12 +433,13 @@ projeto_ia_para_produtividade/
 │   ├── agent_github.py          # ✅ Agente especialista em Issues/Projects
 │   ├── agent_slack.py           # ✅ Agente especialista em comunicação no Slack
 │   ├── agent_orchestrator.py    # ✅ Orquestra agentes especialistas como tools
-│   └── agent_transcricao.py     # 🔜 planejado
+│   └── agent_transcricao.py     # ✅ Limpa conversa e estrutura briefing para tasks
 │
 ├── prompts/
 │   └── README.md
 │
 ├── tools/
+│   ├── transcription_tools.py   # TranscriptionTools: Whisper + leitura de texto
 │   ├── github_tools.py          # GithubTools: Issues (REST) + Projects (gh CLI)
 │   ├── slack_tools.py           # SlackTools: Web API (chat.postMessage)
 │   └── docs/                    # Guias de configuração das ferramentas
@@ -545,6 +555,14 @@ python -m agents.agent_github "Crie uma issue 'Revisar o README' e coloque em To
 python -m agents.agent_github "Consulte a issue #12"
 ```
 
+### Agente de Transcrição direto
+
+```bash
+python -m agents.agent_transcricao "Estruture a transcrição em docs/transcricao_feature_teleconsulta.txt"
+```
+
+O agente carrega o texto, descarta o que não é o contexto principal, divide em tópicos e devolve o `prompt_for_task_agent` para o próximo especialista.
+
 ### Agente Slack direto
 
 ```bash
@@ -558,9 +576,16 @@ Também é possível aceitar a pergunta pela linha de comando livremente — o t
 ```python
 from agents.agent_orchestrator import build_orchestrator
 from agents.agent_github import build_agent
+from agents.agent_transcricao import build_agent as build_transcricao
 
 orquestrador = build_orchestrator()
 resultado = orquestrador.invoke("Crie uma issue para revisar os testes e coloque no Kanban")
+print(resultado["messages"][-1].content)
+
+agente_transcricao = build_transcricao()
+resultado = agente_transcricao.invoke(
+    "Estruture a transcrição em docs/transcricao_feature_teleconsulta.txt"
+)
 print(resultado["messages"][-1].content)
 
 agente_github = build_agent()
@@ -629,8 +654,8 @@ Essa separação facilita testes, manutenção e evolução do sistema.
 
 # 🔮 Próximos passos
 
-- [ ] Implementar agente de transcrição.
-- [ ] Estruturar saída do agente de contexto.
+- [x] Implementar agente de transcrição.
+- [x] Estruturar saída do agente de contexto.
 - [ ] Implementar agente de criação de tasks.
 - [ ] Definir categorias e prioridades.
 - [ ] Integrar agente de tasks com o GitHub.

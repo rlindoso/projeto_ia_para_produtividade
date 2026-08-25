@@ -82,6 +82,43 @@ class EnviarMensagemSlackRequest(BaseModel):
     )
 
 
+class TranscreverAudioRequest(BaseModel):
+    path: str = Field(..., description="Caminho do arquivo de áudio a ser transcrito.")
+    language: str = Field(
+        "pt",
+        description="Código de idioma da transcrição, por exemplo pt.",
+    )
+
+
+class CarregarTextoRequest(BaseModel):
+    path: str = Field(
+        ...,
+        description="Caminho do arquivo de texto ou transcrição, relativo à raiz do projeto ou absoluto.",
+    )
+
+
+class TopicoTranscricao(BaseModel):
+    title: str = Field(..., description="Nome curto do tópico.")
+    summary: str = Field(..., description="O que foi decidido ou pedido neste tópico.")
+    excerpts: list[str] = Field(
+        ...,
+        description="Trechos da conversa que sustentam o tópico.",
+    )
+
+
+class BriefingTranscricao(BaseModel):
+    main_context: str = Field(..., description="Tema central da conversa em uma frase.")
+    discarded: list[str] = Field(..., description="O que foi excluído e por quê.")
+    topics: list[TopicoTranscricao] = Field(
+        ...,
+        description="Tópicos do contexto principal, sem ruído nem assuntos paralelos.",
+    )
+    prompt_for_task_agent: str = Field(
+        ...,
+        description="Prompt autocontido em português (Task, Context, Instructions) para o agente que cria tasks.",
+    )
+
+
 class ConfiguracaoProjeto(BaseModel):
     status: str = Field(..., description="Status no Kanban, ex: Todo, In Progress, Done, Backlog.")
     priority: str = Field(..., description="Prioridade: High, Medium ou Low.")

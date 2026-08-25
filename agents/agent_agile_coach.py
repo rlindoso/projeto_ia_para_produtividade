@@ -15,7 +15,7 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from agents.base import load_chat_model
-from agents.schemas import BacklogEstruturado
+from agents.schemas import BacklogEstruturado, IssueBacklog
 
 _AGENTS_DIR = Path(__file__).resolve().parent
 _ROOT_DIR = _AGENTS_DIR.parent
@@ -27,7 +27,47 @@ def _carregar_prompt() -> str:
     return f"{prompt}\n\n---\n\n### TEMPLATE DO CORPO (FEATURE / STORY)\n\n{structured_output}"
 
 
-SYSTEM_AGILE_COACH = _carregar_prompt()
+SYSTEM_AGILE_COACH = (
+    _carregar_prompt()
+    + """
+
+---
+
+### ENTRADA DO AGENTE DE TRANSCRIÇÃO
+
+A entrada pode ser a conversa original OU um briefing já limpo (JSON ou XML com
+contexto principal, tópicos e o que ficou fora de escopo), produzido pelo
+Agente de Transcrição.
+
+Se receber um briefing:
+- Use SOMENTE esse conteúdo. Não peça e não invente a conversa original.
+- Transforme os tópicos em épicos, features e stories.
+- Não crie issues para o que estiver marcado como fora de escopo.
+"""
+)
+
+
+def formatar_backlog(backlog: BacklogEstruturado) -> str:
+    """Texto completo do backlog para o orquestrador repassar ao Agente GitHub."""
+    blocos = [
+        f"Resumo da reunião: {backlog.resumo_reuniao}",
+        f"Issues geradas ({len(backlog.issues)}):",
+    ]
+    for issue in backlog.issues:
+        blocos.append(_formatar_issue(issue))
+    return "\n\n".join(blocos)
+
+
+def _formatar_issue(issue: IssueBacklog) -> str:
+    cfg = issue.configuracao_projeto
+    epic_pai = f"\nEpic pai: {issue.epic_pai}" if issue.epic_pai else ""
+    labels = ", ".join(cfg.labels) if cfg.labels else "(nenhuma)"
+    return (
+        f"{'=' * 60}\n"
+        f"[{issue.tipo.upper()}] {issue.titulo}{epic_pai}\n"
+        f"Status: {cfg.status} | Priority: {cfg.priority} | Type: {cfg.type} | Labels: {labels}\n"
+        f"\n--- Corpo da Issue ---\n{issue.corpo_issue}"
+    )
 
 
 class AgileCoachAgent:

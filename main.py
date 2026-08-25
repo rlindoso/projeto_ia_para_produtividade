@@ -18,12 +18,16 @@ executáveis.
 
 Agentes implementados:
  - Agente Orquestrador : delega o pedido aos especialistas
+ - Agente Transcrição  : limpa a conversa e estrutura o briefing
+ - Agente Agile Coach  : gera épicos, histórias e subtasks
  - Agente GitHub       : cria e organiza Issues no Project/Kanban
  - Agente Slack        : comunica a equipe com um resumo final
 
 Fluxo:
  você descreve o pedido
    -> orquestrador aciona os especialistas
+   -> transcrição limpa a conversa (se houver)
+   -> agile coach estrutura o backlog
    -> ações executadas no GitHub
    -> resumo enviado ao Slack
 ==============================================
