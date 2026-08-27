@@ -9,6 +9,7 @@ Ele **não cria tasks**.
 import json
 import sys
 from functools import lru_cache
+from pathlib import Path
 
 from langchain_core.tools import tool
 
@@ -130,28 +131,13 @@ TOOLS_TRANSCRICAO = [
     estruturar_conversa,
 ]
 
-SYSTEM_AGENT_TRANSCRICAO = """Você é um Agente de Transcrição. Você não cria tasks.
-
-Sua função é transformar conversa bruta (áudio ou texto) em um briefing estruturado para o agente que vai criar tasks.
-
-Ferramentas:
-- transcrever_audio: use quando a entrada for um arquivo de áudio. Depois passe o texto obtido para estruturar_conversa.
-- carregar_transcricao: use quando o usuário informar o caminho de um arquivo de texto/transcrição. Depois passe o texto obtido para estruturar_conversa.
-- estruturar_conversa: use sempre que já houver o texto da conversa (colado na mensagem ou devolvido pelas outras ferramentas). Ela divide em tópicos, exclui o que não é o contexto principal e devolve o prompt para o próximo agente.
-
-Regras:
-- Se a conversa já estiver no texto da solicitação, chame estruturar_conversa diretamente — não peça o arquivo.
-- Se a entrada for áudio, transcreva primeiro e só então estruture.
-- Se a entrada for um caminho de arquivo de texto, carregue o arquivo e só então estruture.
-- Ao chamar estruturar_conversa, repasse a conversa completa (o texto transcrito ou carregado), não um resumo seu.
-- Não invente conteúdo. Não escreva tasks, tickets nem checklists.
-- A resposta final deve ser em português e apresentar: contexto principal, o que foi descartado, os tópicos e o prompt_for_task_agent devolvido pela ferramenta. Esse prompt é o único insumo que o próximo agente deve receber."""
+SYSTEM_PROMPT = Path("prompts/transcricao_prompt.txt").read_text(encoding="utf-8")
 
 
 @lru_cache(maxsize=1)
 def build_agent() -> Agent:
     """Constrói o Agente de Transcrição (grafo compilado) como singleton."""
-    return Agent(load_chat_model(), TOOLS_TRANSCRICAO, system=SYSTEM_AGENT_TRANSCRICAO)
+    return Agent(load_chat_model(), TOOLS_TRANSCRICAO, system=SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":
