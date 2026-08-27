@@ -22,7 +22,7 @@ _ROOT_DIR = _AGENTS_DIR.parent
 
 
 def _carregar_prompt() -> str:
-    prompt = (_ROOT_DIR / "agile_coach_prompt.txt").read_text(encoding="utf-8")
+    prompt = (_ROOT_DIR / "prompts/agile_coach_prompt.txt").read_text(encoding="utf-8")
     structured_output = (_ROOT_DIR / "agile_coach_structured_output.md").read_text(encoding="utf-8")
     return f"{prompt}\n\n---\n\n### TEMPLATE DO CORPO (FEATURE / STORY)\n\n{structured_output}"
 

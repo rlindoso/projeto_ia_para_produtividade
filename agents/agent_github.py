@@ -8,6 +8,7 @@ operação correspondente na classe ``GithubTools`` (tools/github_tools.py).
 
 import sys
 from functools import lru_cache
+from pathlib import Path
 
 from langchain_core.tools import tool
 from pydantic import BaseModel
@@ -192,27 +193,13 @@ TOOLS_GITHUB = [
     criar_issue_no_project,
 ]
 
-SYSTEM_AGENT_GITHUB = """Você é um Agente GitHub especializado em gerenciar Issues e o Project (Kanban) do repositório configurado.
-
-Diretrizes:
-- Para solicitações do tipo "crie uma tarefa/issue e coloque no quadro", SEMPRE use criar_issue_no_project, que cria a issue e posiciona o card em uma única chamada. Não combine criar_issue com adicionar_ao_project nesse caso.
-- Use criar_issue quando for pedido apenas para abrir a issue, sem Kanban.
-- Use adicionar_ao_project e mover_no_kanban para organizar issues já existentes.
-- Antes de mover no Kanban, se tiver dúvida sobre os nomes válidos das colunas, use listar_campos_project.
-- Use consultar_issue antes de atualizar ou fechar quando não souber o estado atual da issue.
-- Ao chamar uma ferramenta, repasse a solicitação completa e fiel ao usuário: as ferramentas extraem automaticamente os parâmetros necessários.
-- IMPORTANTE: quando uma ferramenta retornar o número de uma issue (por exemplo 12), cite-o explicitamente nas mensagens seguintes usando o formato '#12' (ex.: "Mova a issue #12 para Todo"). Nunca deixe de informar o número quando ele for conhecido; nunca invente um número.
-- CADA tarefa solicitada deve gerar exatamente UMA issue. Depois que criar_issue ou criar_issue_no_project retornar sucesso, não chame criação novamente para a mesma tarefa; se precisar ajustar algo, use atualizar_issue.
-- Se o resultado indicar "ja_existia": true, a issue já existia e foi reaproveitada: informe isso ao usuário e siga adiante, sem criar outra.
-- Nunca invente números de issue, URLs, IDs, cotações ou resultados: use somente os dados devolvidos pelas ferramentas.
-- Se uma ferramenta retornar erro, leia a mensagem de erro e corrija a chamada antes de tentar novamente.
-- Responda em português."""
+SYSTEM_PROMPT = Path("prompts/github_prompt.txt").read_text(encoding="utf-8")
 
 
 @lru_cache(maxsize=1)
 def build_agent() -> Agent:
     """Constrói o Agente GitHub (grafo compilado) como singleton."""
-    return Agent(load_chat_model(), TOOLS_GITHUB, system=SYSTEM_AGENT_GITHUB)
+    return Agent(load_chat_model(), TOOLS_GITHUB, system=SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":
